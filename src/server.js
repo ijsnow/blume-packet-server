@@ -34,6 +34,7 @@ http.createServer(function (req, res) {
       };
     };    
     
+    // Initialize the connection objects.
     var packet = new PacketConnection(packet),
         unit = new UnitConnection(packet.getUnitId());
     
@@ -43,6 +44,7 @@ http.createServer(function (req, res) {
     
     // Respond to request. 
     res.writeHead(200, { "Content-type": "text/json" });
+    // Respond with settings in JSON form.
     res.write(unit.currentSettings());
     res.end();
   });
