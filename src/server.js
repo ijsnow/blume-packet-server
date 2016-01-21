@@ -2,12 +2,13 @@ var http = require('http'),
     MongoClient = require('mongodb').MongoClient,
     UnitConnection = require('./modules/UnitConnection'),
     PacketConnection = require('./modules/PacketConnection'),
+    mongoUrl = "",
     url = "http://localhost",
     port = 3000;
 
 http.createServer(function (req, res) {
   // Connect to the database
-  MongoClient.connect(url, function(err, db) {
+  MongoClient.connect(mongoUrl, function(err, db) {
     // This function will be called by each query that requires a callback and or 
     // would return a promise if not passed a callback.
     // This is a "curry"'ed function.
