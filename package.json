@@ -1,0 +1,26 @@
+{
+  "name": "module-name",
+  "version": "0.0.0",
+  "description": "Server for communicating with the Blume Units",
+  "author": "Isaac Snow <isaac@blumemicrofarms.com>",
+  "scripts": {
+    "prestart": "npm install",
+    "start": "node src/server.js",
+    "predeploy": "echo im about to deploy",
+    "postdeploy": "echo ive deployed"
+  },
+  "main": "src/server.js",
+  "repository": {
+    "type": "git",
+    "url": "Doesn't exist yet"
+  },
+  "dependencies": {
+    "mongodb": "2.1.4",
+    "lodash": "4.0.0"
+  },
+  "devDependencies": {},
+  "preferGlobal": true,
+  "private": true,
+  "publishConfig": {
+  }
+}
