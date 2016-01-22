@@ -15,8 +15,7 @@
     "url": "Doesn't exist yet"
   },
   "dependencies": {
-    "mongodb": "2.1.4",
-    "lodash": "4.0.0"
+    "mongodb": "2.1.4"
   },
   "devDependencies": {},
   "preferGlobal": true,
