@@ -1,5 +1,10 @@
-var defaultUnit = require('../defaultUnit'),
-    coll = 'units';
+"use strict";
+
+const defaultUnit = require('../defaultUnit');
+const config = require('../config');
+const EVENTS = config.EVENTS;
+const TRANSACTION_TYPES = config.TRANSACTION_TYPES;
+const coll = 'units';
 
 class UnitConnection { 
   /**
@@ -9,9 +14,9 @@ class UnitConnection {
    */
   constructor(id) {
     this._id = id;
-  
+    
     // Used to keep track of db transactions that we need to wait for callbacks for. 
-    this.pendingTransactions = 0;
+    this.pendingTransactions = 3;
   }
   
   /**
@@ -19,17 +24,56 @@ class UnitConnection {
    * @function
    * @void
    * @param {https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/db.js} db - The mongo db object.
-   * @param {function} callback - Callback used to disconnect the connection to the db if all trancasctions have been completed.
+   * @param {../ConnectionEventEmitter} connectionEventEmitter - The emitter for handling transactions with the db. 
    */
-  initTransactions(db, callback) {
+  initTransactions(db, connectionEventEmitter) {
     // This is a function to ensure that we get the latest collection each time we access it.
-    this._collection = function() { return db.collection(coll); };
-    // Callback used to disconnect the db.
-    this._callback = callback;
+    this._collection = db.collection(coll);
     
-    if (!this._exists()) {
-      this._create();
-    }
+    // Event emitter used to emit an event when a pending transaction with the db is completed.
+    this._emitter = connectionEventEmitter;
+    this._fetchUnit();
+  }
+  
+  /* 
+   * "Private" methods 
+   */
+  
+  /**
+   * Queries the collection for the unit. If it exists, we get its settings and 
+   * then emit the TRANSACTION_COMPLETED event.
+   * It the unit doesn't exist we create the unit and set the settings to the default settings. 
+   * Finally we emit the GOT_SETTINGS event so we can respond to the request. 
+   * @function
+   * @void
+   */
+  _fetchUnit() {
+    // Use .find(...).limit(1).next(...) to get the unit instead of .findOne because:
+    // https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/collection.js#L1316
+    this._collection.find( { unitId: this._id } ).limit(1).next((err, doc) => {
+      // If we get an error, the unit does not exist yet. 
+      // Let's create it and set the settings to the defaults.
+      if (!doc) { 
+        this._insert();
+        this._settings = defaultUnit.settings;
+      } else {
+        // Otherwise set the settings and tell the emitter that the unit exists.
+        this._settings = doc.settings;
+        this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.UNIT_EXISTS);
+      }
+      
+      // Emit GOT_SETTINGS event. 
+      this._gotSettings();
+    });
+  }
+  
+  /**
+   * Emits the GOT_SETTINGS event so we can respond to the request. 
+   * @function
+   * @void
+   */
+  _gotSettings() {
+    this._emitter.emit(EVENTS.GOT_SETTINGS, this._currentSettings());
   }
   
   /**
@@ -37,58 +81,27 @@ class UnitConnection {
    * @function
    * @return {String(JSON)} The settings for this unit as a JSON string.
    */
-  currentSettings() {
-    return JSON.stringify(this._getSettings());
-  }
-  
-  /* 
-   * "Private" methods 
-   */
-
-  /**
-   * Gets the current settings for this unit from the db.
-   * @function
-   * @return {object} The settings for this unit.
-   */
-  // Don't need to use a callback for this transaction.
-  _getSettings () {
-    return this._collection().find({ unitId: this._id }).settings;
+  _currentSettings() {
+    return JSON.stringify(this._settings);
   }
 
   /**
-   * Gets the current settings for this unit.
-   * @function
-   * @return {object} The settings for this unit.
-   */
-  // Don't need to use a callback for this query.
-  _exists() {
-    return (this._collection().find({ unitId: this._id }).count() !== 0);
-  }
-
-  /**
-   * Inserts a new unit into the db.
+   * Inserts a new unit into the db. The callback emits the event to let the ConnectionEventEmitter 
+   * know that the transaction was completed. 
    * @function
    * @void
    */
-  _create() {
-    this.pendingQueries = this.pendingTransactions + 1;
+  _insert() {
     this._collection.insertOne({
       "unitId": this._id,
-      "name": "Unit " + this._collection().find().count(),
+      "name": "Unit " + this._id,
       "settings": defaultUnit.settings,
       "createdAt": new Date()
-      
-      },
-      // Use arrow function to bind 'this' to the function. 
-      (err) => {
+      }, (err, doc) => {
         if (err) throw err;
         
-        // Remove the pending transaction from the count.
-        this.pendingTransaction = this.pendingTransaction - 1;
-        
-        // Initiate callback (_disconnect in server.js)
-        this._callback(this);
-      });
+        this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.UNIT_EXISTS);
+    });
   }
 }
 

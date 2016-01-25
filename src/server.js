@@ -1,53 +1,34 @@
-var http = require('http'),
-    MongoClient = require('mongodb').MongoClient,
-    UnitConnection = require('./modules/UnitConnection'),
-    PacketConnection = require('./modules/PacketConnection'),
-    mongoUrl = "",
-    url = "http://localhost",
-    port = 3000;
+"use strict";
+
+const http = require('http');
+const MongoClient = require('mongodb').MongoClient;
+const UnitConnection = require('./modules/UnitConnection');
+const PacketConnection = require('./modules/PacketConnection');
+const ConnectionEventEmitter = require('./modules/ConnectionEventEmitter');
+const MONGO_URL = "mongodb://localhost:27017/test";
+const URL = "http://localhost";
+const PORT = 3000;
 
 http.createServer(function (req, res) {
-  // Connect to the database
-  MongoClient.connect(mongoUrl, function(err, db) {
-    // This function will be called by each query that requires a callback and or 
-    // would return a promise if not passed a callback.
-    // This is a "curry"'ed function.
-    // Needed so that we don't close the connection until all of them are done. 
-    // @param otherConnection: type: UnitConnection or PacketConnection 
-    //    The istance of the connection class that is not calling the function.
-    // @param db: type: https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/db.js
-    //    Used to interact with the database.
-    var _disconnect = function (otherConnection, dbConnection) {
-      // Returns a function that will be used to check if the queries in both the Connection objects are completed
-      // then closes the connection to the db. 
-      // @param currentConnection: type UnitConnection or PacketConnection(The opposite of otherConnection)
-      //   The instance of the connection class that is calling this function.
-      return function (currentConnection) {
-        var allTransactionsCompleted = function (connection) {
-          return connection.pendingTransactions === 0;
-        }; 
-        // If all pending transactions are done, close the connection.
-        if (allTransactionsCompleted(currentConnection) && 
-            allTransactionsCompleted(otherConnection)) {
-          dbConnection.close();        
-        }
-      };
-    };    
-    
-    // Initialize the connection objects.
-    var packet = new PacketConnection(packet),
-        unit = new UnitConnection(packet.getUnitId());
-    
-    // Initiate transactions.
-    packet.initTransactions(db, _disconnect(unit, db));
-    unit.initTransactions(db, _disconnect(packet, db));
-    
-    // Respond to request. 
-    res.writeHead(200, { "Content-type": "text/json" });
-    // Respond with settings in JSON form.
-    res.write(unit.currentSettings());
-    res.end();
-  });
-}).listen(port);
+  console.log("res: " + res);
+  console.log("req: " + req);
+  if (req.url) {
+    // Connect to the database
+    console.log("Recieved request. Connecting to MongoDB...");
+    //Connect to the database
+    MongoClient.connect(MONGO_URL, function(err, db) {
+      console.log("Connected to MongoDB.");
+      
+      // Initialize the connection objects.
+      const packet = new PacketConnection(req.url);
+      const unit = new UnitConnection(packet.getUnitId());
+      const connectionEventEmitter = new ConnectionEventEmitter(db, res);
 
-console.log('Server running at ' + url + ':' + port);
+      // Initiate transactions.
+      packet.initTransactions(db, connectionEventEmitter);
+      unit.initTransactions(db, connectionEventEmitter);
+    });
+  }
+}).listen(PORT);
+
+console.log('Server running at ' + URL + ':' + PORT);

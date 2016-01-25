@@ -1,5 +1,10 @@
-var url = require('url'),
-    coll = 'packets';
+"use strict";
+
+const url = require('url');
+const config = require('../config');
+const EVENTS = config.EVENTS;
+const TRANSACTION_TYPES = config.TRANSACTION_TYPES;
+const coll = 'packets';
 
 class PacketConnection {
   /**
@@ -7,9 +12,9 @@ class PacketConnection {
    * @constructor
    * @param {string} path - Path from the req.url. Parsed to create the packet.
    */
-  constructor(path, db) {
+  constructor(path) {
     this._packet = this._parseUrl(path);
-    this.pendingTransaction = 0;
+    this.pendingTransaction = 1;
   }
   
   /**
@@ -19,11 +24,10 @@ class PacketConnection {
    * @param {https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/db.js} db - The mongo db object.
    * @param {function} callback - Callback used to disconnect the connection to the db if all trancasctions have been completed.
    */
-  initTransactions(db, callback) {
+  initTransactions(db, connectionEventEmitter) {
     this._collection = db.collection(coll);
-    this._callback = callback;
-    
-    this._save();
+    this._emitter = connectionEventEmitter;
+    this._insert();
   }
   
   /**
@@ -40,14 +44,11 @@ class PacketConnection {
    */
 
   /**
-   * Inserts the packet into the db.
+   * Inserts the packet into the db. Then emits the TRANSACTION_COMPLETED event. 
    * @function
    * @void
    */
-  _save() {
-    // Register the pending transaction.
-    this.pendingQueries = this.pendingTransaction + 1;
-    
+  _insert() {
     this._collection.insertOne({
       unitId: this._packet.unitId,
       temperature: this._packet.temperature,
@@ -60,11 +61,8 @@ class PacketConnection {
     (err) => {
       if (err) throw err;
       
-      // Remove the pending transaction from the count.
-      this.pendingTransaction = this.pendingTransaction - 1;
-      
-      // Initiate callback (_disconnect in server.js)
-      this._callback(this);
+      // Emit the TRANSACTION_COMPLETED to see if we can disconnect from the db.
+      this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.PACKET_INSERTED);
     });
   }
 
@@ -75,8 +73,10 @@ class PacketConnection {
    * @return {object} The settings for this unit.
    */
   _parseUrl(path) {
-    // Parse url to create the packet
-    return {};
+    let packet = url.parse(path, true).query;
+    packet.raw = path;
+    
+    return packet;
   }
 }
 
