@@ -1,8 +1,13 @@
-**This has not been tested. Just a starting point.**
-**Waiting for the electronics to be done to make a database to test with.** 
-
-This will be the server that listens for the communication with the units. 
+This will be the server that communicates with the units. 
 Will likely be at packets.blumemicrofarms.com
 
-General overview is the units will make a GET request to this unit and this server will respond with the units current settings.
-We respond with the settings to let the unit know we recieved it as well as tell the unit to check if the unit's settings have been updated. 
+Listens for GET requests coming from units. 
+When a request has been made the server responds with the unit's current settings. 
+
+General Process:
+  Recieve request
+  Parse url to create packet
+  Add packet to DB
+  Check if unit exists in the DB yet
+  If not, create unit
+  Respond to the request with the units settings.
