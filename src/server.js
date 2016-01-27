@@ -18,7 +18,7 @@ http.createServer(function (req, res) {
     //Connect to the database
     MongoClient.connect(MONGO_URL, function(err, db) {
       console.log("Connected to MongoDB.");
-      
+
       // Initialize the connection objects.
       const packet = new PacketConnection(req.url);
       const unit = new UnitConnection(packet.getUnitId());
@@ -31,4 +31,4 @@ http.createServer(function (req, res) {
   }
 }).listen(PORT);
 
-console.log('Server running at ' + URL + ':' + PORT);
+console.log(`Server running at ${URL}:${PORT}`);

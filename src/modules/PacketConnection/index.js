@@ -16,7 +16,7 @@ class PacketConnection {
     this._packet = this._parseUrl(path);
     this.pendingTransaction = 1;
   }
-  
+
   /**
    * Initiates the transactions to the db.
    * @function
@@ -29,7 +29,7 @@ class PacketConnection {
     this._emitter = connectionEventEmitter;
     this._insert();
   }
-  
+
   /**
    * Gets the ID of the unit this packet came from.
    * @function
@@ -38,13 +38,13 @@ class PacketConnection {
   getUnitId() {
     return this._packet.unitId;
   }
-  
-  /* 
-   * "Private" methods 
+
+  /*
+   * "Private" methods
    */
 
   /**
-   * Inserts the packet into the db. Then emits the TRANSACTION_COMPLETED event. 
+   * Inserts the packet into the db. Then emits the TRANSACTION_COMPLETED event.
    * @function
    * @void
    */
@@ -56,14 +56,12 @@ class PacketConnection {
       light: this._packet.light,
       raw: this._packet.raw,
       createdAt: new Date()
-    }, 
+    })
     // Use an arrow function to bind 'this' to the function
-    (err) => {
-      if (err) throw err;
-      
+    .then(() => {
       // Emit the TRANSACTION_COMPLETED to see if we can disconnect from the db.
       this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.PACKET_INSERTED);
-    });
+    }).catch((err) => { throw err; });
   }
 
   /**
@@ -75,7 +73,7 @@ class PacketConnection {
   _parseUrl(path) {
     let packet = url.parse(path, true).query;
     packet.raw = path;
-    
+
     return packet;
   }
 }

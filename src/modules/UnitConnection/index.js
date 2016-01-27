@@ -6,7 +6,7 @@ const EVENTS = config.EVENTS;
 const TRANSACTION_TYPES = config.TRANSACTION_TYPES;
 const coll = 'units';
 
-class UnitConnection { 
+class UnitConnection {
   /**
    * Handles the connection with the units collection.
    * @constructor
@@ -14,36 +14,36 @@ class UnitConnection {
    */
   constructor(id) {
     this._id = id;
-    
-    // Used to keep track of db transactions that we need to wait for callbacks for. 
+
+    // Used to keep track of db transactions that we need to wait for callbacks for.
     this.pendingTransactions = 3;
   }
-  
+
   /**
    * Initiates the transactions to the db.
    * @function
    * @void
    * @param {https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/db.js} db - The mongo db object.
-   * @param {../ConnectionEventEmitter} connectionEventEmitter - The emitter for handling transactions with the db. 
+   * @param {../ConnectionEventEmitter} connectionEventEmitter - The emitter for handling transactions with the db.
    */
   initTransactions(db, connectionEventEmitter) {
     // This is a function to ensure that we get the latest collection each time we access it.
     this._collection = db.collection(coll);
-    
+
     // Event emitter used to emit an event when a pending transaction with the db is completed.
     this._emitter = connectionEventEmitter;
     this._fetchUnit();
   }
-  
-  /* 
-   * "Private" methods 
+
+  /*
+   * "Private" methods
    */
-  
+
   /**
-   * Queries the collection for the unit. If it exists, we get its settings and 
+   * Queries the collection for the unit. If it exists, we get its settings and
    * then emit the TRANSACTION_COMPLETED event.
-   * It the unit doesn't exist we create the unit and set the settings to the default settings. 
-   * Finally we emit the GOT_SETTINGS event so we can respond to the request. 
+   * It the unit doesn't exist we create the unit and set the settings to the default settings.
+   * Finally we emit the GOT_SETTINGS event so we can respond to the request.
    * @function
    * @void
    */
@@ -51,9 +51,9 @@ class UnitConnection {
     // Use .find(...).limit(1).next(...) to get the unit instead of .findOne because:
     // https://github.com/mongodb/node-mongodb-native/blob/2.1/lib/collection.js#L1316
     this._collection.find( { unitId: this._id } ).limit(1).next((err, doc) => {
-      // If we get an error, the unit does not exist yet. 
+      // If we get an error, the unit does not exist yet.
       // Let's create it and set the settings to the defaults.
-      if (!doc) { 
+      if (!doc) {
         this._insert();
         this._settings = defaultUnit.settings;
       } else {
@@ -61,21 +61,21 @@ class UnitConnection {
         this._settings = doc.settings;
         this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.UNIT_EXISTS);
       }
-      
-      // Emit GOT_SETTINGS event. 
+
+      // Emit GOT_SETTINGS event.
       this._gotSettings();
     });
   }
-  
+
   /**
-   * Emits the GOT_SETTINGS event so we can respond to the request. 
+   * Emits the GOT_SETTINGS event so we can respond to the request.
    * @function
    * @void
    */
   _gotSettings() {
     this._emitter.emit(EVENTS.GOT_SETTINGS, this._currentSettings());
   }
-  
+
   /**
    * Gets the current settings for this unit and turns it into JSON.
    * @function
@@ -86,8 +86,8 @@ class UnitConnection {
   }
 
   /**
-   * Inserts a new unit into the db. The callback emits the event to let the ConnectionEventEmitter 
-   * know that the transaction was completed. 
+   * Inserts a new unit into the db. The callback emits the event to let the ConnectionEventEmitter
+   * know that the transaction was completed.
    * @function
    * @void
    */
@@ -97,11 +97,13 @@ class UnitConnection {
       "name": "Unit " + this._id,
       "settings": defaultUnit.settings,
       "createdAt": new Date()
-      }, (err, doc) => {
-        if (err) throw err;
-        
-        this._emitter.emit(EVENTS.TRANSACTION_COMPLETED, TRANSACTION_TYPES.UNIT_EXISTS);
-    });
+    })
+    .then(() => {
+        this._emitter.emit(
+          EVENTS.TRANSACTION_COMPLETED,
+          TRANSACTION_TYPES.UNIT_EXISTS
+        );
+    }).catch((err) => { throw err; });
   }
 }
 
